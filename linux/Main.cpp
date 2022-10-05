@@ -141,8 +141,9 @@ int parseCoinType(const std::string& s)
 
 // ----------------------------------------------------------------------------
 
-bool parseRange(const std::string& s, Int& start, Int& end)
+bool parseRange(const std::string& s, std::vector<Int>& starts, std::vector<Int>& ends)
 {
+	Int start, end;
 	size_t pos = s.find(':');
 
 	if (pos == std::string::npos) {
@@ -173,8 +174,51 @@ bool parseRange(const std::string& s, Int& start, Int& end)
 		}
 	}
 
+	starts.push_back(start);
+	ends.push_back(end);
+
 	return true;
 }
+
+// ----------------------------------------------------------------------------
+
+void parseRangeFile(const std::string& fname, std::vector<Int>& starts, std::vector<Int>& ends)
+{
+	printf("Parsing range file: %s\n", fname.c_str());
+	FILE* fin;
+	const int MAX_LINE_LENGTH=1000;
+	char line[MAX_LINE_LENGTH];
+
+	if (fname.length() > 0) {
+		fin = fopen(fname.c_str(), "r");
+		if (fin == NULL) {
+			printf("  Cannot open %s for rading\n", fname.c_str());
+			exit(-1);
+		}
+	}
+
+	// ranges.txt is now open
+	while(fgets(line, MAX_LINE_LENGTH, fin)){
+		// remove trailing new line
+		line[strcspn(line, "\n")] = 0;
+        Int s;
+        s.SetBase16(line);
+        starts.push_back(s);
+
+        Int e;
+		e.Set(&s);
+		e.Add(0x1E8480ULL); // fixed length
+		ends.push_back(e);
+    }
+
+    // for debugging
+    // for(size_t i=0; i<vec.size(); i++) {
+    // 	printf("\nrange start: %s\n", vec[i].GetBase16().c_str());
+    // }
+
+	fclose(fin);
+}
+
 
 #ifdef WIN64
 BOOL WINAPI CtrlHandler(DWORD fdwCtrlType)
@@ -231,6 +275,10 @@ int main(int argc, char** argv)
 	rangeStart.SetInt32(0);
 	rangeEnd.SetInt32(0);
 
+	// TODO: iashraf
+	std::vector<Int> rangeStartList; 
+	std::vector<Int> rangeEndList; 
+
 	int searchMode = 0;
 	int coinType = COIN_BTC;
 
@@ -252,6 +300,7 @@ int main(int argc, char** argv)
 	parser.add("-m", "--mode", true);
 	parser.add("", "--coin", true);
 	parser.add("", "--range", true);
+	parser.add("-R", "--ranges", true);
 	parser.add("-r", "--rkey", true);
 	parser.add("-v", "--version", false);
 	parser.add("-n", "--next", true);
@@ -340,7 +389,11 @@ int main(int argc, char** argv)
 			}
 			else if (optArg.equals("", "--range")) {
 				std::string range = optArg.arg;
-				parseRange(range, rangeStart, rangeEnd);
+				parseRange(range, rangeStartList, rangeEndList);
+			}
+			else if (optArg.equals("-R", "--ranges")) {
+				std::string rangeFile = optArg.arg;
+				parseRangeFile(rangeFile, rangeStartList, rangeEndList);
 			}
 			else if (optArg.equals("-r", "--rkey")) {
 				rKey = std::stoull(optArg.arg);
@@ -525,7 +578,7 @@ int main(int argc, char** argv)
 	HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 	SetConsoleTextAttribute(hConsole, color);
 #endif
-	
+
 	printf("\n");
 	printf("  Rotor-Cuda v" RELEASE "\n");
 	printf("\n");
@@ -599,24 +652,30 @@ int main(int argc, char** argv)
 #ifdef WIN64
 	if (SetConsoleCtrlHandler(CtrlHandler, TRUE)) {
 		Rotor* v;
-		switch (searchMode) {
-		case (int)SEARCH_MODE_MA:
-		case (int)SEARCH_MODE_MX:
-			v = new Rotor(inputFile, compMode, searchMode, coinType, gpuEnable, outputFile, useSSE,
-				maxFound, rKey, nbit2, next, zet, display, rangeStart.GetBase16(), rangeEnd.GetBase16(), should_exit);
-			break;
-		case (int)SEARCH_MODE_SA:
-		case (int)SEARCH_MODE_SX:
-			v = new Rotor(hashORxpoint, compMode, searchMode, coinType, gpuEnable, outputFile, useSSE,
-				maxFound, rKey, nbit2, next, zet, display, rangeStart.GetBase16(), rangeEnd.GetBase16(), should_exit);
-			break;
-		default:
-			printf("\n\n  Nothing to do, exiting\n");
-			return 0;
-			break;
+
+    for(size_t i=0; i<rangeStartList.size(); i++) {
+	    	Int start(&rangeStartList[i]);
+	    	Int end(&rangeEndList[i]);
+
+			switch (searchMode) {
+			case (int)SEARCH_MODE_MA:
+			case (int)SEARCH_MODE_MX:
+				v = new Rotor(inputFile, compMode, searchMode, coinType, gpuEnable, outputFile, useSSE,
+					maxFound, rKey, nbit2, next, zet, display, start.GetBase16(), end.GetBase16(), should_exit);
+				break;
+			case (int)SEARCH_MODE_SA:
+			case (int)SEARCH_MODE_SX:
+				v = new Rotor(hashORxpoint, compMode, searchMode, coinType, gpuEnable, outputFile, useSSE,
+					maxFound, rKey, nbit2, next, zet, display, start.GetBase16(), end.GetBase16(), should_exit);
+				break;
+			default:
+				printf("\n\n  Nothing to do, exiting\n");
+				return 0;
+				break;
+			}
+			v->Search(nbCPUThread, gpuId, gridSize, should_exit);
+			delete v;
 		}
-		v->Search(nbCPUThread, gpuId, gridSize, should_exit);
-		delete v;
 		printf("\n\n  BYE\n");
 		return 0;
 	}
@@ -627,24 +686,31 @@ int main(int argc, char** argv)
 #else
 	signal(SIGINT, CtrlHandler);
 	Rotor* v;
-	switch (searchMode) {
-	case (int)SEARCH_MODE_MA:
-	case (int)SEARCH_MODE_MX:
-		v = new Rotor(inputFile, compMode, searchMode, coinType, gpuEnable, outputFile, useSSE,
-			maxFound, rKey, nbit2, next, zet, display, rangeStart.GetBase16(), rangeEnd.GetBase16(), should_exit);
-		break;
-	case (int)SEARCH_MODE_SA:
-	case (int)SEARCH_MODE_SX:
-		v = new Rotor(hashORxpoint, compMode, searchMode, coinType, gpuEnable, outputFile, useSSE,
-			maxFound, rKey, nbit2, next, zet, display, rangeStart.GetBase16(), rangeEnd.GetBase16(), should_exit);
-		break;
-	default:
-		printf("\n\n  Nothing to do, exiting\n");
-		return 0;
-		break;
-	}
-	v->Search(nbCPUThread, gpuId, gridSize, should_exit);
-	delete v;
+
+    for(size_t i=0; i<rangeStartList.size(); i++) {
+    	Int start(&rangeStartList[i]);
+    	Int end(&rangeEndList[i]);
+
+		switch (searchMode) {
+		case (int)SEARCH_MODE_MA:
+		case (int)SEARCH_MODE_MX:
+			v = new Rotor(inputFile, compMode, searchMode, coinType, gpuEnable, outputFile, useSSE,
+				maxFound, rKey, nbit2, next, zet, display, start.GetBase16(), end.GetBase16(), should_exit);
+			break;
+		case (int)SEARCH_MODE_SA:
+		case (int)SEARCH_MODE_SX:
+			v = new Rotor(hashORxpoint, compMode, searchMode, coinType, gpuEnable, outputFile, useSSE,
+				maxFound, rKey, nbit2, next, zet, display, start.GetBase16(), end.GetBase16(), should_exit);
+			break;
+		default:
+			printf("\n\n  Nothing to do, exiting\n");
+			return 0;
+			break;
+		}
+		v->Search(nbCPUThread, gpuId, gridSize, should_exit);
+		delete v;
+    }
+
 	return 0;
 #endif
 }

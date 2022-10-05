@@ -92,4 +92,7 @@ clean:
 	@rm -f obj/*.o
 	@rm -f obj/GPU/*.o
 	@rm -f obj/hash/*.o
+	@rm -f Rotor Found.txt
 
+test: all
+	./Rotor --coin ETH -m addresses -i /data/repositories/fiverr-work/rotor-work/bin-file/fiverTargets.bin --ranges ranges.txt
