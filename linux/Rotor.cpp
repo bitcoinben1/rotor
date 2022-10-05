@@ -46,6 +46,7 @@ Rotor::Rotor(const std::string& inputFile, int compMode, int searchMode, int coi
 	this->stroka = stroka;
 	this->searchMode = searchMode;
 	this->coinType = coinType;
+
 	this->rangeStart.SetBase16(rangeStart.c_str());
 	this->rangeStart8.SetBase16(rangeStart.c_str());
 	this->rhex.SetBase16(rangeStart.c_str());
@@ -54,6 +55,7 @@ Rotor::Rotor(const std::string& inputFile, int compMode, int searchMode, int coi
 	this->rangeDiff2.Sub(&this->rangeStart);
 	this->rangeDiffbar.Set(&this->rangeDiff2);
 	this->rangeDiffcp.Set(&this->rangeDiff2);
+
 	this->lastrKey = 0;
 
 	secp = new Secp256K1();
@@ -159,6 +161,7 @@ Rotor::Rotor(const std::vector<unsigned char>& hashORxpoint, int compMode, int s
 	this->stroka = stroka;
 	this->searchMode = searchMode;
 	this->coinType = coinType;
+
 	this->rangeStart.SetBase16(rangeStart.c_str());
 	this->rangeStart8.SetBase16(rangeStart.c_str());
 	this->rhex.SetBase16(rangeStart.c_str());
@@ -167,6 +170,7 @@ Rotor::Rotor(const std::vector<unsigned char>& hashORxpoint, int compMode, int s
 	this->rangeDiff2.Sub(&this->rangeStart);
 	this->rangeDiffcp.Set(&this->rangeDiff2);
 	this->rangeDiffbar.Set(&this->rangeDiff2);
+
 	this->targetCounter = 1;
 	this->nbit2 = nbit2;
 	secp = new Secp256K1();
@@ -187,6 +191,24 @@ Rotor::Rotor(const std::vector<unsigned char>& hashORxpoint, int compMode, int s
 	printf("\n");
 
 	InitGenratorTable();
+}
+
+// ----------------------------------------------------------------------------
+void Rotor::updateRanges(const std::string& rangeStart, const std::string& rangeEnd) {
+	this->rangeStart.SetBase16(rangeStart.c_str());
+	this->rangeStart8.SetBase16(rangeStart.c_str());
+	this->rhex.SetBase16(rangeStart.c_str());
+	this->rangeEnd.SetBase16(rangeEnd.c_str());
+	this->rangeDiff2.Set(&this->rangeEnd);
+	this->rangeDiff2.Sub(&this->rangeStart);
+	this->rangeDiffbar.Set(&this->rangeDiff2);
+	this->rangeDiffcp.Set(&this->rangeDiff2);
+
+	printf("\n");
+
+	//TODO: Question: do we need to re-initialize generator table?
+	InitGenratorTable();
+
 }
 
 // ----------------------------------------------------------------------------

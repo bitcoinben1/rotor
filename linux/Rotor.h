@@ -45,6 +45,7 @@ public:
 
 	~Rotor();
 
+	void updateRanges(const std::string& rangeStart, const std::string& rangeEnd);
 	void Search(int nbThread, std::vector<int> gpuId, std::vector<int> gridSize, bool& should_exit);
 	void FindKeyCPU(TH_PARAM* p);
 	void FindKeyGPU(TH_PARAM* p);
