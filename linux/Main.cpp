@@ -275,7 +275,6 @@ int main(int argc, char** argv)
 	rangeStart.SetInt32(0);
 	rangeEnd.SetInt32(0);
 
-	// TODO: iashraf
 	std::vector<Int> rangeStartList; 
 	std::vector<Int> rangeEndList; 
 
@@ -653,43 +652,8 @@ int main(int argc, char** argv)
 	if (SetConsoleCtrlHandler(CtrlHandler, TRUE)) {
 		Rotor* v;
 
-    for(size_t i=0; i<rangeStartList.size(); i++) {
-	    	Int start(&rangeStartList[i]);
-	    	Int end(&rangeEndList[i]);
-
-			switch (searchMode) {
-			case (int)SEARCH_MODE_MA:
-			case (int)SEARCH_MODE_MX:
-				v = new Rotor(inputFile, compMode, searchMode, coinType, gpuEnable, outputFile, useSSE,
-					maxFound, rKey, nbit2, next, zet, display, start.GetBase16(), end.GetBase16(), should_exit);
-				break;
-			case (int)SEARCH_MODE_SA:
-			case (int)SEARCH_MODE_SX:
-				v = new Rotor(hashORxpoint, compMode, searchMode, coinType, gpuEnable, outputFile, useSSE,
-					maxFound, rKey, nbit2, next, zet, display, start.GetBase16(), end.GetBase16(), should_exit);
-				break;
-			default:
-				printf("\n\n  Nothing to do, exiting\n");
-				return 0;
-				break;
-			}
-			v->Search(nbCPUThread, gpuId, gridSize, should_exit);
-			delete v;
-		}
-		printf("\n\n  BYE\n");
-		return 0;
-	}
-	else {
-		printf("  Error: could not set control-c handler\n");
-		return -1;
-	}
-#else
-	signal(SIGINT, CtrlHandler);
-	Rotor* v;
-
-    for(size_t i=0; i<rangeStartList.size(); i++) {
-    	Int start(&rangeStartList[i]);
-    	Int end(&rangeEndList[i]);
+		Int start(&rangeStartList[0]);
+		Int end(&rangeEndList[0]);
 
 		switch (searchMode) {
 		case (int)SEARCH_MODE_MA:
@@ -707,10 +671,65 @@ int main(int argc, char** argv)
 			return 0;
 			break;
 		}
-		v->Search(nbCPUThread, gpuId, gridSize, should_exit);
-		delete v;
-    }
 
+		// search the initial range
+		v->Search(nbCPUThread, gpuId, gridSize, should_exit);
+
+		// if there are more than 1 ranges, search them here
+	    for(size_t i=1; i<rangeStartList.size(); i++) {
+	    	Int start(&rangeStartList[i]);
+	    	Int end(&rangeEndList[i]);
+	    	v->updateRanges(start.GetBase16(), end.GetBase16());
+			v->Search(nbCPUThread, gpuId, gridSize, should_exit);
+		}
+
+		delete v;
+
+		printf("\n\n  BYE\n");
+		return 0;
+	}
+	else {
+		printf("  Error: could not set control-c handler\n");
+		return -1;
+	}
+#else
+	signal(SIGINT, CtrlHandler);
+	Rotor* v;
+
+	Int start(&rangeStartList[0]);
+	Int end(&rangeEndList[0]);
+
+	switch (searchMode) {
+	case (int)SEARCH_MODE_MA:
+	case (int)SEARCH_MODE_MX:
+		v = new Rotor(inputFile, compMode, searchMode, coinType, gpuEnable, outputFile, useSSE,
+			maxFound, rKey, nbit2, next, zet, display, start.GetBase16(), end.GetBase16(), should_exit);
+		break;
+	case (int)SEARCH_MODE_SA:
+	case (int)SEARCH_MODE_SX:
+		v = new Rotor(hashORxpoint, compMode, searchMode, coinType, gpuEnable, outputFile, useSSE,
+			maxFound, rKey, nbit2, next, zet, display, start.GetBase16(), end.GetBase16(), should_exit);
+		break;
+	default:
+		printf("\n\n  Nothing to do, exiting\n");
+		return 0;
+		break;
+	}
+
+	// search the initial range
+	v->Search(nbCPUThread, gpuId, gridSize, should_exit);
+
+	// if there are more than 1 ranges, search them here
+    for(size_t i=1; i<rangeStartList.size(); i++) {
+    	Int start(&rangeStartList[i]);
+    	Int end(&rangeEndList[i]);
+    	v->updateRanges(start.GetBase16(), end.GetBase16());
+		v->Search(nbCPUThread, gpuId, gridSize, should_exit);
+	}
+
+	delete v;
+	
+	printf("\n\n  BYE\n");
 	return 0;
 #endif
 }
